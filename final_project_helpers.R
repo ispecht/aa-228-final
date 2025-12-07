@@ -125,7 +125,7 @@ update_cases <- function(cases) {
   new_cases
 }
 
-simulate <- function(policy_number) {
+simulate <- function(policy_number, P_DIAGNOSTIC, P_GENOMIC, INIT_CASES, N_GENERATIONS, ALPHA) {
   
   cases <- INIT_CASES
   
@@ -315,6 +315,61 @@ plot_policy_comparison <- function(data_by_policy, metric_name = "Total Cost",
   # Add log scale if requested
   if(log_scale) {
     p <- p + scale_x_log10(labels = scales::comma)
+  }
+  
+  return(p)
+}
+
+# Function to plot violin plots for parameter sensitivity analysis
+plot_parameter_violin <- function(data_by_param, param_values, 
+                                  param_name = "Parameter",
+                                  metric_name = "Total Cost",
+                                  log_scale = TRUE) {
+  
+  # Check if data is negative (costs)
+  is_negative <- all(sapply(data_by_param, function(x) all(x <= 0)))
+  
+  # Convert list to data frame in long format
+  df_list <- list()
+  for(i in 1:length(data_by_param)) {
+    df_list[[i]] <- data.frame(
+      Value = data_by_param[[i]],
+      Parameter = param_values[i]
+    )
+  }
+  df <- bind_rows(df_list)
+  
+  # Convert Parameter to factor to maintain order
+  df$Parameter <- factor(df$Parameter, levels = param_values)
+  
+  # If negative and log scale requested, take absolute value for plotting
+  if(is_negative && log_scale) {
+    df$PlotValue <- abs(df$Value)
+    y_label <- paste0(metric_name, " (absolute value)")
+  } else {
+    df$PlotValue <- df$Value
+    y_label <- metric_name
+  }
+  
+  # Create violin plot
+  p <- ggplot(df, aes(x = Parameter, y = PlotValue, fill = Parameter)) +
+    geom_violin(alpha = 0.7, trim = FALSE, scale = "width", 
+                adjust = 2, width = 0.9) +
+    geom_boxplot(width = 0.1, alpha = 0.5, outlier.shape = NA) +
+    scale_fill_viridis_d(option = "plasma") +
+    labs(title = paste0("Effect of ", param_name, " on ", metric_name),
+         subtitle = paste0("Based on ", length(data_by_param[[1]]), " replications per parameter value"),
+         x = param_name,
+         y = y_label) +
+    theme_minimal() +
+    theme(legend.position = "none",
+          plot.title = element_text(face = "bold", size = 14),
+          plot.subtitle = element_text(size = 10),
+          axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  # Add log scale if requested
+  if(log_scale) {
+    p <- p + scale_y_log10(labels = scales::comma)
   }
   
   return(p)
